@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Signals — Evidence-Based Startup Assessment</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f5f3ef; --bg2: #edeae4;
+      --purple: #5a4fa8; --purple-light: #7c6fcd;
+      --purple-dim: rgba(90,79,168,0.08); --purple-border: rgba(90,79,168,0.2);
+      --green: #1e6b3a; --green-dim: rgba(30,107,58,0.08); --green-border: rgba(30,107,58,0.2);
+      --text: #1a1a2e; --muted: #5a5870; --muted-lo: #9896aa;
+      --border: rgba(26,26,46,0.1); --card: #ffffff;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: 'Source Sans 3', sans-serif; font-size: 16px; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+    /* NAV */
+    header { border-bottom: 1px solid var(--border); padding: 16px 48px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; background: rgba(245,243,239,0.94); backdrop-filter: blur(16px); }
+    .logo { display: flex; align-items: center; gap: 11px; text-decoration: none; }
+    .logo-mark { width: 32px; height: 32px; background: linear-gradient(135deg,#7c6fcd,#5a4fa8); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display',serif; font-size: 14px; font-weight: 700; color: white; }
+    .logo-name { font-family: 'Playfair Display',serif; font-size: 16px; font-weight: 600; color: var(--text); display: block; }
+    .logo-sub { font-size: 10px; color: var(--muted-lo); letter-spacing: 1.2px; text-transform: uppercase; margin-top: 1px; display: block; }
+    nav { display: flex; align-items: center; gap: 4px; }
+    .nav-link { font-size: 14px; color: var(--muted); text-decoration: none; padding: 7px 14px; border-radius: 6px; border: 1px solid transparent; transition: all 0.15s; font-weight: 500; }
+    .nav-link:hover { color: var(--text); background: var(--purple-dim); border-color: var(--purple-border); }
+    .nav-cta { font-size: 14px; color: var(--purple); text-decoration: none; padding: 7px 16px; border-radius: 6px; font-weight: 600; background: var(--purple-dim); border: 1px solid var(--purple-border); transition: all 0.15s; }
+    .nav-cta:hover { background: rgba(90,79,168,0.14); }
+
+    /* BANNER */
+    .banner { background: linear-gradient(135deg,#1a1a2e,#2d2a52); color: white; text-align: center; padding: 14px 24px; }
+    .banner-inner { display: inline-flex; align-items: center; gap: 28px; flex-wrap: wrap; justify-content: center; }
+    .banner-stat { display: flex; align-items: baseline; gap: 8px; }
+    .banner-num { font-family: 'Playfair Display',serif; font-size: 22px; font-weight: 700; color: white; }
+    .banner-label { font-size: 13px; color: rgba(255,255,255,0.65); }
+    .banner-sep { width: 1px; height: 24px; background: rgba(255,255,255,0.15); }
+
+    /* HERO */
+    .hero { max-width: 820px; margin: 0 auto; padding: 80px 48px 56px; text-align: center; }
+    .eyebrow { display: inline-block; background: var(--purple-dim); border: 1px solid var(--purple-border); border-radius: 20px; padding: 5px 16px; font-size: 12px; color: var(--purple); letter-spacing: 1.3px; text-transform: uppercase; font-weight: 600; margin-bottom: 28px; animation: fadeUp 0.6s ease both; }
+    h1 { font-family: 'Playfair Display',serif; font-size: 52px; font-weight: 700; line-height: 1.16; margin-bottom: 20px; animation: fadeUp 0.6s 0.1s ease both; }
+    h1 em { font-style: italic; color: var(--purple-light); }
+    .hero-sub { font-size: 18px; color: var(--muted); line-height: 1.75; max-width: 520px; margin: 0 auto 48px; animation: fadeUp 0.6s 0.2s ease both; }
+    .divider { width: 1px; height: 40px; background: var(--border); margin: 0 auto 48px; animation: fadeUp 0.6s 0.25s ease both; }
+
+    /* PRODUCT CARDS — 3 column */
+    .products { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; max-width: 1040px; margin: 0 auto; padding: 0 48px 72px; animation: fadeUp 0.6s 0.3s ease both; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s; box-shadow: 0 1px 4px rgba(26,26,46,0.06); }
+    .card:hover { border-color: var(--purple-border); box-shadow: 0 4px 20px rgba(90,79,168,0.12); transform: translateY(-2px); }
+    .card.featured { border-color: var(--purple-border); background: linear-gradient(145deg,#ffffff,#f7f5ff); box-shadow: 0 2px 12px rgba(90,79,168,0.1); }
+    .card.investor { border-color: rgba(26,26,46,0.14); background: linear-gradient(145deg,#ffffff,#f8f7f4); }
+    .card-tag { font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted-lo); margin-bottom: 12px; font-weight: 600; }
+    .card.featured .card-tag { color: var(--purple); }
+    .card.investor .card-tag { color: var(--text); opacity: 0.5; }
+    .card-name { font-family: 'Playfair Display',serif; font-size: 26px; font-weight: 700; margin-bottom: 10px; }
+    .card-desc { font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 18px; flex: 1; }
+    .card-delivers { font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted-lo); font-weight: 600; margin-bottom: 10px; }
+    .points { display: flex; flex-direction: column; gap: 7px; margin-bottom: 24px; }
+    .point { display: flex; align-items: flex-start; gap: 9px; }
+    .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--muted-lo); margin-top: 8px; flex-shrink: 0; }
+    .card.featured .dot { background: var(--purple-light); }
+    .card.investor .dot { background: var(--text); opacity: 0.3; }
+    .point span { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .card-cta { display: flex; align-items: center; justify-content: space-between; padding: 11px 15px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; color: var(--muted); font-weight: 500; transition: all 0.15s; margin-top: auto; }
+    .card:hover .card-cta { border-color: var(--purple-border); color: var(--purple); }
+    .card.featured .card-cta { background: linear-gradient(135deg,#5a4fa8,#7c6fcd); border-color: transparent; color: white; }
+    .card.investor .card-cta { border-color: rgba(26,26,46,0.18); color: var(--text); }
+    .card.investor:hover .card-cta { border-color: var(--purple-border); color: var(--purple); }
+
+    /* BENCHMARK BLOCK */
+    .bsection { max-width: 1040px; margin: 0 auto 72px; padding: 0 48px; }
+    .bcard { background: linear-gradient(135deg,#1a1a2e,#2d2a52); border-radius: 16px; padding: 40px 52px; display: flex; align-items: center; gap: 0; color: white; }
+    .bstat { text-align: center; flex: 0 0 180px; }
+    .bnum { font-family: 'Playfair Display',serif; font-size: 52px; font-weight: 700; line-height: 1; margin-bottom: 8px; }
+    .blabel { font-size: 12px; color: rgba(255,255,255,0.5); letter-spacing: 1px; text-transform: uppercase; line-height: 1.5; }
+    .bdivider { width: 1px; background: rgba(255,255,255,0.1); align-self: stretch; margin: 0 40px; flex-shrink: 0; }
+    .btext { flex: 1; }
+    .btext h3 { font-family: 'Playfair Display',serif; font-size: 24px; font-weight: 700; margin-bottom: 10px; line-height: 1.3; }
+    .btext p { font-size: 15px; color: rgba(255,255,255,0.6); line-height: 1.75; }
+
+    /* BUILT BY */
+    .builtby { max-width: 1040px; margin: 0 auto 72px; padding: 0 48px; }
+    .builtby-inner { border: 1px solid var(--border); border-radius: 16px; padding: 36px 48px; background: var(--card); display: flex; align-items: center; gap: 40px; box-shadow: 0 1px 4px rgba(26,26,46,0.05); }
+    .builtby-label { font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted-lo); font-weight: 600; margin-bottom: 10px; }
+    .builtby-text { font-family: 'Playfair Display',serif; font-size: 20px; font-weight: 600; color: var(--text); line-height: 1.4; flex: 1; }
+    .builtby-sub { font-size: 14px; color: var(--muted); line-height: 1.7; flex: 1; }
+
+    /* HOW IT WORKS */
+    .section { max-width: 1040px; margin: 0 auto; padding: 0 48px 80px; }
+    .section-label { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted-lo); text-align: center; margin-bottom: 32px; font-weight: 600; }
+    .steps { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; }
+    .step { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px 18px; box-shadow: 0 1px 3px rgba(26,26,46,0.05); }
+    .step-num { font-family: 'Playfair Display',serif; font-size: 24px; font-weight: 700; color: rgba(90,79,168,0.22); margin-bottom: 10px; }
+    .step-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .step-desc { font-size: 13px; color: var(--muted); line-height: 1.7; }
+    .step.hi { border-color: var(--purple-border); background: linear-gradient(145deg,#ffffff,#f7f5ff); }
+    .step.hi .step-num { color: var(--purple-light); }
+    .badge { display: inline-block; background: var(--green-dim); color: var(--green); font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; margin-top: 8px; border: 1px solid var(--green-border); }
+
+    footer { border-top: 1px solid var(--border); padding: 28px 48px; text-align: center; background: var(--bg2); }
+    .footer-text { font-size: 13px; color: var(--muted-lo); line-height: 2; }
+    .footer-text a { color: var(--muted); text-decoration: none; }
+    .footer-text a:hover { color: var(--text); }
+
+    @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    @media (max-width:900px) {
+      .products { grid-template-columns:1fr; padding:0 24px 56px; }
+      .builtby-inner { flex-direction:column; gap:16px; padding:28px 24px; }
+    }
+    @media (max-width:768px) {
+      h1 { font-size:36px; } .hero { padding:52px 24px 40px; }
+      .steps { grid-template-columns:1fr 1fr; } header { padding:13px 20px; } .section { padding:0 24px 56px; }
+      .bsection { padding:0 24px; } .bcard { flex-direction:column; padding:28px 24px; text-align:center; } .bdivider { width:80px; height:1px; margin:24px auto; }
+      .builtby { padding:0 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="index.html" class="logo">
+    <div class="logo-mark">S</div>
+    <div><span class="logo-name">Signals</span><span class="logo-sub">Assessment Platform</span></div>
+  </a>
+  <nav>
+    <a href="first-look.html" class="nav-link">First Look</a>
+    <a href="my-signal.html" class="nav-link">My Signal</a>
+    <a href="pricing.html" class="nav-link">Pricing</a>
+    <a href="mailto:info@neuralsurface.com" class="nav-cta">Get access →</a>
+  </nav>
+</header>
+
+<div class="banner">
+  <div class="banner-inner">
+    <div class="banner-stat">
+      <span class="banner-num">18,568</span>
+      <span class="banner-label">market transactions in database</span>
+    </div>
+    <div class="banner-sep"></div>
+    <div class="banner-stat">
+      <span class="banner-num">258</span>
+      <span class="banner-label">signal checks per assessment — every score is challenged before it ships</span>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="hero">
+    <div class="eyebrow">Startup Signal Assessment</div>
+    <h1>Before the meeting.<br /><em>Same language. Both sides.</em></h1>
+    <p class="hero-sub">Evidence-based assessment for founders and investors. No narrative. No fluff. The same read, before the room.</p>
+    <div class="divider"></div>
+  </div>
+
+  <div class="products">
+
+    <a href="first-look.html" class="card">
+      <div class="card-tag">For Founders · ESE v2.0</div>
+      <div class="card-name">First Look</div>
+      <p class="card-desc">Before the CIN. Before the deck. When the founder and the idea are the entire asset — a structured read on whether it's worth a first meeting.</p>
+      <div class="card-delivers">What you receive</div>
+      <div class="points">
+        <div class="point"><div class="dot"></div><span>A scored verdict on founder and idea credibility</span></div>
+        <div class="point"><div class="dot"></div><span>Every verifiable milestone rated for signal strength</span></div>
+        <div class="point"><div class="dot"></div><span>What's missing and what it would take to close the gap</span></div>
+        <div class="point"><div class="dot"></div><span>A clear answer: is this worth a first meeting?</span></div>
+      </div>
+      <div class="card-cta"><span>Begin First Look</span><span>→</span></div>
+    </a>
+
+    <a href="my-signal.html" class="card featured">
+      <div class="card-tag">For Founders · ISS v20.1</div>
+      <div class="card-name">My Signal</div>
+      <p class="card-desc">Full signal depth across all dimensions — benchmarked against 18,568 market transactions. Know exactly where you stand and what to fix.</p>
+      <div class="card-delivers">What you receive</div>
+      <div class="points">
+        <div class="point"><div class="dot"></div><span>A scored verdict across every signal dimension</span></div>
+        <div class="point"><div class="dot"></div><span>Ranked gaps — what's holding the score back</span></div>
+        <div class="point"><div class="dot"></div><span>Exact next steps before your next raise or pitch</span></div>
+        <div class="point"><div class="dot"></div><span>Bear, base and bull case — what moves your number</span></div>
+      </div>
+      <div class="card-cta"><span>Begin My Signal</span><span>→</span></div>
+    </a>
+
+    <a href="mailto:info@neuralsurface.com?subject=Batch Screen Enquiry" class="card investor">
+      <div class="card-tag">For Investors · B2B</div>
+      <div class="card-name">Batch Screen</div>
+      <p class="card-desc">Screen up to 200 startups in minutes. Upload what you have — a company name, founder name, URL and/or sector is enough to start.</p>
+      <div class="card-delivers">What you receive</div>
+      <div class="points">
+        <div class="point"><div class="dot"></div><span>Signal score for each startup in your batch</span></div>
+        <div class="point"><div class="dot"></div><span>100-word verdict per startup — flags, gaps, and signal strength</span></div>
+        <div class="point"><div class="dot"></div><span>Ranked output — sort by score, sector, or stage</span></div>
+        <div class="point"><div class="dot"></div><span>Benchmarked against 18,568 transactions</span></div>
+      </div>
+      <div class="card-cta"><span>Request pricing</span><span>→</span></div>
+    </a>
+
+  </div>
+
+  <div class="bsection">
+    <div class="bcard">
+      <div class="bstat">
+        <div class="bnum">18,568</div>
+        <div class="blabel">Market<br/>Transactions</div>
+      </div>
+      <div class="bdivider"></div>
+      <div class="bstat">
+        <div class="bnum">258</div>
+        <div class="blabel">Signal Checks<br/>Per Assessment</div>
+      </div>
+      <div class="bdivider"></div>
+      <div class="btext">
+        <h3>Every score is challenged before it ships</h3>
+        <p>Assessments run against real Indian funding data — benchmarked by stage, sector, and market timing. 258 individual signal checks before a score is confirmed. Used for founder assessments and investor batch screening of up to 200 startups at a time.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="builtby">
+    <div class="builtby-inner">
+      <div style="flex:0 0 auto;">
+        <div class="builtby-label">Built by</div>
+        <div class="builtby-text">Professionals from<br/>the other side<br/>of the table.</div>
+      </div>
+      <div style="width:1px;background:var(--border);align-self:stretch;flex-shrink:0;"></div>
+      <div class="builtby-sub">Signals is built by operators with backgrounds across cybersecurity, financial services, and startup incubation — with active involvement in DPIIT-recognised incubator programmes. The assessment frameworks come from pattern recognition across real founder interactions. India-specific. Evidence-first. NISM XIX-C certified.</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">How it works</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-title">Fill the form</div>
+        <p class="step-desc">Get your access code. Complete the structured assessment form for your chosen product.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-title">Submit evidence</div>
+        <p class="step-desc">Upload documents — CoI, LinkedIn PDFs, pitch deck, revenue proof. More evidence, stronger signal.</p>
+      </div>
+      <div class="step hi">
+        <div class="step-num">03</div>
+        <div class="step-title">Free findings report</div>
+        <p class="step-desc">We share a 100-word findings report — at no cost, if your submission is complete.</p>
+        <span class="badge">Free</span>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <div class="step-title">Pay if interested</div>
+        <p class="step-desc">₹4,999 for the full PDF report — detailed findings, gap analysis, and exact next steps.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">05</div>
+        <div class="step-title">Report in 24 hrs</div>
+        <p class="step-desc">Delivered within 24 hours of payment. Founders get gaps. Investors get flags and a verdict.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <p class="footer-text">
+    Signals — evidence-based startup assessment &nbsp;·&nbsp;
+    <a href="mailto:info@neuralsurface.com">info@neuralsurface.com</a>&nbsp;·&nbsp;
+    <a href="pricing.html">Pricing</a>&nbsp;·&nbsp;
+    Not investment advice.
+  </p>
+</footer>
+</body>
+</html>

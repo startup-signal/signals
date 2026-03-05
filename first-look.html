@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>First Look — Signals</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#f5f3ef;font-size:16px;}</style>
+</head>
+<body><div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback, useRef } = React;
+
+const WORKER_URL = "https://startup-world.sgarg-ext.workers.dev";
+const BASE_PATH = "/signals";
+
+const api = (path, body, extra={}) =>
+  fetch(`${WORKER_URL}${path}`, {
+    method:"POST", headers:{"Content-Type":"application/json",...extra}, body:JSON.stringify(body)
+  }).then(r=>r.json());
+
+const uploadFile = async (file) => {
+  const fd = new FormData(); fd.append("file", file);
+  const res = await fetch(`${WORKER_URL}/upload`, {method:"POST", body:fd});
+  const data = await res.json();
+  if(data.error) throw new Error(data.error);
+  return data.url;
+};
+
+const C = {
+  bg:"#f5f3ef", purple:"#5a4fa8", purpleDim:"rgba(90,79,168,0.08)",
+  purpleBorder:"rgba(90,79,168,0.2)", green:"#2d7d46", amber:"#FFC000",
+  red:"#e94560", text:"#1a1a2e", muted:"#5a5870",
+  mutedLo:"#9896aa", border:"rgba(26,26,46,0.1)",
+  card:"#ffffff",
+};
+
+const SECTIONS = [
+  {
+    id:"identity", title:"Company Identity", icon:"◈", compulsory:true,
+    desc:"Basic verifiable facts. CIN is optional — leave blank if not yet incorporated.",
+    fields:[
+      {id:"Company Name", label:"Company / Venture Name", type:"text", placeholder:"Legal name or working name", required:true},
+      {id:"Company URL", label:"Website or Landing Page", type:"text", placeholder:"https://", required:false},
+      {id:"CIN", label:"CIN (if incorporated)", type:"text", placeholder:"Leave blank if pre-incorporation", required:false,
+       hint:"Leave blank if not yet incorporated — your submission will be assessed under Ideation Mode."},
+      {id:"CoI Certificate", label:"Certificate of Incorporation", type:"file", accept:".pdf,.jpg,.png", required:false,
+       hint:"Upload if available. Not required for pre-incorporation submissions."},
+      {id:"DPIIT Certificate", label:"DPIIT Recognition Certificate", type:"file", accept:".pdf,.jpg,.png", required:false,
+       hint:"Optional — attach if DPIIT recognised"},
+    ]
+  },
+  {
+    id:"founders", title:"Founders", icon:"◉", compulsory:true,
+    desc:"Founder details and LinkedIn profiles. At this stage the founder is often the entire signal.",
+    fields:[
+      {id:"Founder 1 Name", label:"Founder 1 Full Name", type:"text", placeholder:"Full name", required:true},
+      {id:"Founder 1 LinkedIn PDF", label:"Founder 1 LinkedIn Profile PDF", type:"file", accept:".pdf", required:true,
+       hint:"Save your LinkedIn profile as PDF — File → Print → Save as PDF"},
+      {id:"Founder 2 Name", label:"Founder 2 Full Name", type:"text", placeholder:"Leave blank if solo founder", required:false},
+      {id:"Founder 2 LinkedIn PDF", label:"Founder 2 LinkedIn PDF", type:"file", accept:".pdf", required:false,
+       hint:"Required if Founder 2 name is provided"},
+      {id:"Founder 3 Name", label:"Founder 3 Full Name", type:"text", placeholder:"Leave blank if not applicable", required:false},
+      {id:"Founder 3 LinkedIn PDF", label:"Founder 3 LinkedIn PDF", type:"file", accept:".pdf", required:false,
+       hint:"Required if Founder 3 name is provided"},
+      {id:"Founders Full Time", label:"Are all founders working full-time?", type:"select",
+       options:["Yes — all founders full time","No — some founders part time","Solo founder — full time","Solo founder — part time"], required:true},
+    ]
+  },
+  {
+    id:"idea", title:"Idea & Evidence", icon:"◎", compulsory:true,
+    desc:"The idea, the market, and any evidence you have. This is the core of First Look.",
+    fields:[
+      {id:"Idea Summary", label:"What are you building? (2–3 sentences)", type:"textarea",
+       placeholder:"The problem, your solution, and who it's for", required:true,
+       hint:"Be specific. Avoid jargon. If you can't explain it clearly here, that is itself a signal."},
+      {id:"Why Now", label:"Why is this the right time? What changed?", type:"textarea",
+       placeholder:"Regulatory shift, platform launch, technology threshold, market event...", required:false,
+       hint:"A named external event that makes this hypothesis testable now is a strong signal."},
+      {id:"Idea Docs", label:"Supporting Documents", type:"file", accept:".pdf,.pptx,.docx", required:false,
+       hint:"Concept note, prototype, patent filing, research paper, early deck. More independent artifacts = stronger conviction signal."},
+      {id:"Prior Work URL", label:"Prior Work / Evidence URLs", type:"textarea",
+       placeholder:"GitHub repo, published paper, prototype demo, press mention — one per line", required:false,
+       hint:"Independent verifiable evidence of work already done."},
+    ]
+  },
+  {
+    id:"competitive", title:"Competitive Context", icon:"◌", compulsory:false,
+    optionalNote:"Adding competitive context unlocks the market timing and thesis assessment.",
+    desc:"How this fits in the market. Optional but strengthens the signal considerably.",
+    fields:[
+      {id:"Competitive Thesis", label:"Who exists in this space?", type:"textarea",
+       placeholder:"Name the incumbents or alternatives. Who are you up against, or alongside?", required:false,
+       hint:"Honest competitive awareness is a positive signal. 'No competitors' is rarely credible."},
+      {id:"Why Us", label:"Why can you win this?", type:"textarea",
+       placeholder:"Founder advantage, technical edge, access, domain depth, network...", required:false},
+      {id:"Research Spinout", label:"Is this a research or academic spinout?", type:"select",
+       options:["No","Yes — from IIT/IISc/NIT or equivalent","Yes — from international institution","Yes — independent research"], required:false,
+       hint:"Research-origin ventures are assessed under a dedicated module covering IP ownership, TRL level, and commercialisation pathway."},
+    ]
+  },
+];
+
+function App() {
+  const [view, setView] = useState("login");
+  const [code, setCode] = useState(""); const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [startupInfo, setStartupInfo] = useState(null);
+  const submissionIdRef = useRef(null);
+  const [formData, setFormData] = useState({}); const [uploads, setUploads] = useState({});
+  const [step, setStep] = useState(0); const [stepErr, setStepErr] = useState("");
+  const [saving, setSaving] = useState(false); const [saveMsg, setSaveMsg] = useState("");
+  const [submitting, setSubmitting] = useState(false); const [submitted, setSubmitted] = useState(false);
+
+  const login = async () => {
+    if(!code.trim()){setErr("Enter your access code.");return;}
+    setLoading(true);setErr("");
+    const d = await api("/login",{accessCode:code.trim()});
+    setLoading(false);
+    if(d.error){setErr(d.error);return;}
+    setStartupInfo(d.startup);
+    submissionIdRef.current = d.submissionId;
+    const clean = {...(d.existingSubmission||{})};
+    delete clean.Status; delete clean["Submitted At"];
+    setFormData(clean);
+    setView("form");
+  };
+
+  const save = useCallback(async (fields) => {
+    if(!startupInfo) return;
+    setSaving(true);
+    const d = await api("/save",{accessCode:code, submissionId:submissionIdRef.current, fields});
+    if(d.submissionId && !submissionIdRef.current) submissionIdRef.current = d.submissionId;
+    setSaving(false); setSaveMsg("Saved ✓"); setTimeout(()=>setSaveMsg(""),2000);
+  },[code,startupInfo]);
+
+  useEffect(()=>{
+    if(view==="form"&&step>0&&step<=SECTIONS.length&&Object.keys(formData).length>0){
+      const t = setTimeout(()=>save(formData),1500); return ()=>clearTimeout(t);
+    }
+  },[formData,step]);
+
+  const set = (id,val) => setFormData(p=>({...p,[id]:val}));
+
+  const handleFile = async (id,file) => {
+    if(!file) return;
+    setUploads(p=>({...p,[id]:{file,uploading:true,url:null,error:null}}));
+    try {
+      const url = await uploadFile(file);
+      setUploads(p=>({...p,[id]:{file,uploading:false,url,error:null}}));
+      set(id,url);
+    } catch(e) {
+      setUploads(p=>({...p,[id]:{file,uploading:false,url:null,error:"Upload failed — try again"}}));
+    }
+  };
+
+  const next = () => {
+    setStepErr("");
+    const sec = SECTIONS[step-1];
+    if(sec?.compulsory){
+      const errs=[];
+      sec.fields.forEach(f=>{
+        if(f.required){
+          if(f.type==="file"){if(!uploads[f.id]?.url)errs.push(f.label);}
+          else{if(!formData[f.id]||String(formData[f.id]).trim()==="")errs.push(f.label);}
+        }
+      });
+      if(sec.id==="founders"){
+        if(formData["Founder 2 Name"]?.trim()&&!uploads["Founder 2 LinkedIn PDF"]?.url)errs.push("Founder 2 LinkedIn PDF");
+        if(formData["Founder 3 Name"]?.trim()&&!uploads["Founder 3 LinkedIn PDF"]?.url)errs.push("Founder 3 LinkedIn PDF");
+      }
+      if(errs.length>0){setStepErr("Required: "+errs.join(", "));return;}
+    }
+    setStep(s=>s+1);
+  };
+
+  const submit = async () => {
+    setSubmitting(true);
+    await save({...formData,Status:"Submitted"});
+    setTimeout(()=>{setSubmitting(false);setSubmitted(true);},1600);
+  };
+
+  const cinMissing = !formData["CIN"]||String(formData["CIN"]).trim()==="";
+  const sec = step>=1&&step<=SECTIONS.length ? SECTIONS[step-1] : null;
+
+  const GS = `
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .inp{width:100%;background:#ffffff;border:1px solid rgba(26,26,46,0.15);border-radius:7px;color:#1a1a2e;font-family:'Source Sans 3',sans-serif;font-size:15px;padding:11px 14px;outline:none;transition:border-color .2s;}
+    .inp:focus{border-color:#5a4fa8;box-shadow:0 0 0 3px rgba(90,79,168,0.08)}
+    .inp::placeholder{color:#9896aa}
+    select.inp option{background:#ffffff;color:#1a1a2e}
+    textarea.inp{resize:vertical}
+    .btn{border:none;border-radius:7px;cursor:pointer;font-family:'Source Sans 3',sans-serif;font-size:14px;font-weight:500;padding:11px 20px;transition:opacity .18s;}
+    .btn:hover{opacity:.84}.btn:disabled{opacity:.33;cursor:not-allowed}
+    .fzone{border:1px dashed rgba(26,26,46,0.2);border-radius:7px;padding:16px;cursor:pointer;transition:border-color .2s;text-align:center;}
+    .fzone:hover{border-color:#5a4fa8}
+    .fin{display:none}
+    .ai{animation:fadeUp .3s ease both}
+  `;
+
+  const page = {minHeight:"100vh",background:C.bg,color:C.text,fontFamily:"'Source Sans 3',sans-serif",display:"flex",flexDirection:"column"};
+  const hdr = {borderBottom:`1px solid ${C.border}`,padding:"15px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(245,243,239,0.94)",backdropFilter:"blur(16px)"};
+  const main = {flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"40px 20px"};
+  const card = {width:"100%",maxWidth:540,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"34px 30px"};
+
+  if(view==="login") return (
+    <div style={page}><style>{GS}</style>
+      <div style={hdr}>
+        <Logo sub="First Look" />
+        <nav style={{display:"flex",alignItems:"center",gap:4}}>
+          <a href="first-look.html" style={{fontSize:14,color:C.purple,textDecoration:"none",padding:"7px 14px",borderRadius:6,background:C.purpleDim,border:`1px solid ${C.purpleBorder}`,fontWeight:600}}>First Look</a>
+          <a href="my-signal.html" style={{fontSize:14,color:C.muted,textDecoration:"none",padding:"7px 14px",borderRadius:6,border:"1px solid transparent",fontWeight:500}}>My Signal</a>
+          <a href="pricing.html" style={{fontSize:14,color:C.muted,textDecoration:"none",padding:"7px 14px",borderRadius:6,border:"1px solid transparent",fontWeight:500}}>Pricing</a>
+          <a href="mailto:info@neuralsurface.com" style={{fontSize:14,color:C.purple,textDecoration:"none",padding:"7px 16px",borderRadius:6,background:C.purpleDim,border:`1px solid ${C.purpleBorder}`,fontWeight:600,marginLeft:4}}>Get access →</a>
+        </nav>
+      </div>
+      <div style={main}>
+        <div style={{width:"100%",maxWidth:640,display:"flex",gap:20,alignItems:"flex-start"}} className="ai">
+
+          {/* Login card */}
+          <div style={{flex:"0 0 300px",background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"28px 26px",boxShadow:"0 1px 4px rgba(26,26,46,0.06)"}}>
+            <div style={{marginBottom:22}}>
+              <div style={{fontSize:10,letterSpacing:"1.4px",textTransform:"uppercase",color:C.purple,marginBottom:10,fontWeight:600}}>First Look · ESE v2.0</div>
+              <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,marginBottom:8,color:C.text}}>A structured read.</h2>
+              <p style={{fontSize:14,color:C.muted,lineHeight:1.72}}>The founder and the idea assessed before the meeting.</p>
+            </div>
+            <div style={{background:C.purpleDim,border:`1px solid ${C.purpleBorder}`,borderRadius:8,padding:"12px 14px",marginBottom:20}}>
+              <p style={{fontSize:13,color:C.muted,lineHeight:1.75}}>
+                <strong style={{color:C.text}}>No access code?</strong><br/>
+                Write to <a href="mailto:info@neuralsurface.com?subject=First Look Access Request" style={{color:C.purple,textDecoration:"none"}}>info@neuralsurface.com</a>
+              </p>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <input className="inp" placeholder="Enter your access code" value={code} onChange={e=>setCode(e.target.value)} onKeyDown={e=>e.key==="Enter"&&login()}/>
+              <button className="btn" onClick={login} disabled={loading} style={{background:"linear-gradient(135deg,#5a4fa8,#7c6fcd)",color:"white",fontSize:15,padding:"12px 20px"}}>
+                {loading?"Verifying...":"Begin First Look →"}
+              </button>
+            </div>
+            {err&&<p style={{marginTop:13,fontSize:13,color:C.red,textAlign:"center"}}>{err}</p>}
+            <p style={{marginTop:16,fontSize:11,color:C.mutedLo,textAlign:"center"}}>
+              <a href="index.html" style={{color:"inherit",textDecoration:"none"}}>← Back to Signals</a>
+            </p>
+          </div>
+
+          {/* What you get */}
+          <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"28px 26px",boxShadow:"0 1px 4px rgba(26,26,46,0.06)"}}>
+            <div style={{fontSize:10,letterSpacing:"1.4px",textTransform:"uppercase",color:C.mutedLo,marginBottom:6,fontWeight:600}}>What you receive</div>
+            <div style={{fontSize:13,color:C.mutedLo,marginBottom:20,lineHeight:1.6}}>Free 100-word findings report on every complete submission. Full PDF report for ₹4,999, delivered within 24 hrs of payment.</div>
+            {[
+              ["A scored verdict on founder and idea credibility","Not a generic score — a verdict built from verifiable evidence across the specific dimensions that matter at idea and early stage."],
+              ["Every verifiable milestone rated for signal strength","A dated read on what's confirmed, what's missing, and what each gap means for the investment thesis."],
+              ["What's missing and what it would take to close the gap","Ranked gaps with a clear read on which are closeable before the meeting and which are structural."],
+              ["A clear answer: is this worth a first meeting?","The question every investor is asking. Answered directly, with evidence."],
+            ].map(([title, desc]) => (
+              <div key={title} style={{display:"flex",gap:11,marginBottom:15}}>
+                <div style={{width:5,height:5,borderRadius:"50%",background:C.purple,marginTop:7,flexShrink:0,opacity:0.4}}/>
+                <div>
+                  <div style={{fontSize:14,fontWeight:600,color:C.text,marginBottom:3}}>{title}</div>
+                  <div style={{fontSize:13,color:C.muted,lineHeight:1.65}}>{desc}</div>
+                </div>
+              </div>
+            ))}
+            <div style={{marginTop:16,paddingTop:14,borderTop:`1px solid ${C.border}`,display:"flex",gap:8}}>
+              <div style={{flex:1,background:"rgba(30,107,58,0.07)",border:"1px solid rgba(30,107,58,0.18)",borderRadius:7,padding:"10px 12px",textAlign:"center"}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#1e6b3a"}}>Free</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2}}>100-word findings report</div>
+              </div>
+              <div style={{flex:1,background:C.purpleDim,border:`1px solid ${C.purpleBorder}`,borderRadius:7,padding:"10px 12px",textAlign:"center"}}>
+                <div style={{fontSize:12,fontWeight:700,color:C.purple}}>₹4,999</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2}}>Full report · PDF · 24 hr delivery</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={page}><style>{GS}</style>
+      <div style={hdr}>
+        <Logo sub="First Look" />
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <nav style={{display:"flex",alignItems:"center",gap:4}}>
+            <a href="first-look.html" style={{fontSize:13,color:C.purple,textDecoration:"none",padding:"6px 12px",borderRadius:6,background:C.purpleDim,border:`1px solid ${C.purpleBorder}`,fontWeight:600}}>First Look</a>
+            <a href="my-signal.html" style={{fontSize:13,color:C.muted,textDecoration:"none",padding:"6px 12px",borderRadius:6,border:"1px solid transparent",fontWeight:500}}>My Signal</a>
+            <a href="pricing.html" style={{fontSize:13,color:C.muted,textDecoration:"none",padding:"6px 12px",borderRadius:6,border:"1px solid transparent",fontWeight:500}}>Pricing</a>
+          </nav>
+          {saving&&<span style={{fontSize:12,color:C.muted}}>Saving...</span>}
+          {saveMsg&&<span style={{fontSize:12,color:C.green}}>{saveMsg}</span>}
+          {step>=1&&step<=SECTIONS.length&&(
+            <div style={{display:"flex",alignItems:"center",gap:9}}>
+              <div style={{width:96,height:2,background:C.border,borderRadius:1,overflow:"hidden"}}>
+                <div style={{width:`${Math.round((step/SECTIONS.length)*100)}%`,height:"100%",background:"linear-gradient(90deg,#7c6fcd,#a08ef0)",borderRadius:1,transition:"width .3s"}}/>
+              </div>
+              <span style={{fontSize:12,color:C.muted}}>{step}/{SECTIONS.length}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={main}>
+        <div style={card} className="ai">
+
+          {/* Welcome */}
+          {step===0&&(
+            <div>
+              <div style={{fontSize:10,letterSpacing:"1.4px",textTransform:"uppercase",color:C.purple,marginBottom:14}}>First Look — Assessment</div>
+              <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:23,marginBottom:9}}>
+                {startupInfo?.name?`Welcome, ${startupInfo.name}`:"Let's begin."}
+              </h2>
+              <p style={{fontSize:13,color:C.muted,lineHeight:1.72,marginBottom:22}}>
+                You'll complete <strong style={{color:C.text}}>4 sections</strong>. The first three are required. Section 4 is optional but strengthens the competitive signal.
+              </p>
+              <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:22}}>
+                {SECTIONS.map(s=>(
+                  <div key={s.id} style={{display:"flex",alignItems:"center",gap:11,padding:"9px 13px",background:"rgba(255,255,255,0.02)",border:`1px solid ${C.border}`,borderRadius:7}}>
+                    <span style={{fontSize:15,color:C.purple,width:18}}>{s.icon}</span>
+                    <div style={{flex:1}}>
+                      <span style={{fontSize:13,color:C.text}}>{s.title}</span>
+                      {s.optionalNote&&<span style={{fontSize:11,color:C.muted,marginLeft:7}}>— {s.optionalNote}</span>}
+                    </div>
+                    {s.compulsory
+                      ?<span style={{fontSize:10,background:"rgba(233,69,96,0.1)",color:C.red,borderRadius:3,padding:"2px 7px"}}>Required</span>
+                      :<span style={{fontSize:10,background:C.purpleDim,color:C.purple,borderRadius:3,padding:"2px 7px"}}>Optional</span>
+                    }
+                  </div>
+                ))}
+              </div>
+              <div style={{background:"rgba(255,255,255,0.02)",border:`1px solid ${C.border}`,borderRadius:8,padding:"14px 16px",marginBottom:20}}>
+                <p style={{fontSize:12,color:"rgba(232,228,220,0.45)",lineHeight:1.8,marginBottom:11}}>
+                  <strong style={{color:C.muted}}>Declaration:</strong> I confirm I am authorised to share these materials; the information is accurate to the best of my knowledge; I consent to Signals using this data solely to generate this assessment. This report does not constitute investment advice.
+                </p>
+                <label style={{display:"flex",alignItems:"flex-start",gap:9,cursor:"pointer"}}>
+                  <input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} style={{marginTop:2,width:14,height:14,accentColor:C.purple,flexShrink:0}}/>
+                  <span style={{fontSize:13,color:C.text,lineHeight:1.5}}>I confirm and consent.</span>
+                </label>
+              </div>
+              <button className="btn" onClick={()=>{if(consent)setStep(1);}} disabled={!consent}
+                style={{background:consent?"linear-gradient(135deg,#7c6fcd,#5a4fa8)":"rgba(255,255,255,0.05)",color:"white",width:"100%",fontSize:15,padding:"13px"}}>
+                Begin →
+              </button>
+            </div>
+          )}
+
+          {/* Sections */}
+          {step>=1&&step<=SECTIONS.length&&sec&&(
+            <div>
+              <div style={{marginBottom:22}}>
+                <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:7}}>
+                  <span style={{fontSize:19,color:C.purple}}>{sec.icon}</span>
+                  <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21}}>{sec.title}</h2>
+                  {sec.compulsory
+                    ?<span style={{fontSize:10,background:"rgba(233,69,96,0.1)",color:C.red,borderRadius:3,padding:"2px 7px"}}>Required</span>
+                    :<span style={{fontSize:10,background:C.purpleDim,color:C.purple,borderRadius:3,padding:"2px 7px"}}>Optional</span>
+                  }
+                </div>
+                <p style={{fontSize:13,color:C.muted,lineHeight:1.62}}>
+                  {sec.optionalNote?<span style={{color:"rgba(160,142,240,0.8)"}}>{sec.optionalNote}</span>:sec.desc}
+                </p>
+                {sec.id==="identity"&&step===1&&cinMissing&&(
+                  <div style={{marginTop:11,padding:"9px 13px",background:"rgba(255,192,0,0.05)",border:"1px solid rgba(255,192,0,0.18)",borderRadius:7}}>
+                    <p style={{fontSize:12,color:C.amber,lineHeight:1.6}}>◈ No CIN? Leave it blank — your submission will be assessed under <strong>Ideation Mode</strong>, designed for pre-incorporation founders.</p>
+                  </div>
+                )}
+              </div>
+
+              <div style={{display:"flex",flexDirection:"column",gap:17}}>
+                {sec.fields.map(f=>(
+                  <div key={f.id}>
+                    <label style={{display:"block",marginBottom:5,fontSize:13,fontWeight:500,color:"rgba(232,228,220,0.68)"}}>
+                      {f.label}
+                      {f.required&&<span style={{color:C.red,marginLeft:3}}>*</span>}
+                      {!f.required&&f.type!=="file"&&<span style={{fontSize:10,background:C.purpleDim,color:C.purple,borderRadius:3,padding:"1px 6px",marginLeft:7}}>optional</span>}
+                    </label>
+                    {f.type==="file"
+                      ?<FileField f={f} up={uploads[f.id]} onChange={file=>handleFile(f.id,file)} C={C}/>
+                      :f.type==="textarea"
+                        ?<textarea className="inp" rows={3} placeholder={f.placeholder} value={formData[f.id]||""} onChange={e=>set(f.id,e.target.value)}/>
+                        :f.type==="select"
+                          ?<select className="inp" value={formData[f.id]||""} onChange={e=>set(f.id,e.target.value)}>
+                              <option value="">Select...</option>
+                              {f.options.map(o=><option key={o} value={o}>{o}</option>)}
+                            </select>
+                          :<input className="inp" type="text" placeholder={f.placeholder} value={formData[f.id]||""} onChange={e=>set(f.id,e.target.value)}/>
+                    }
+                    {f.hint&&<p style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.6}}>{f.hint}</p>}
+                  </div>
+                ))}
+              </div>
+
+              {stepErr&&<div style={{marginTop:14,padding:"9px 13px",background:"rgba(233,69,96,0.07)",border:"1px solid rgba(233,69,96,0.18)",borderRadius:7}}><p style={{fontSize:12,color:C.red}}>{stepErr}</p></div>}
+
+              <div style={{display:"flex",gap:10,marginTop:26}}>
+                <button className="btn" onClick={()=>{setStepErr("");setStep(s=>s-1);}} style={{background:"rgba(255,255,255,0.05)",color:C.text,border:`1px solid ${C.border}`}}>← Back</button>
+                {step<SECTIONS.length
+                  ?<button className="btn" onClick={next} style={{background:"linear-gradient(135deg,#7c6fcd,#5a4fa8)",color:"white",flex:1}}>Save & Continue →</button>
+                  :<button className="btn" onClick={submit} style={{background:"linear-gradient(135deg,#2d7d46,#1a5c30)",color:"white",flex:1}}>Submit for Assessment ✦</button>
+                }
+              </div>
+            </div>
+          )}
+
+          {/* Submitting */}
+          {submitting&&!submitted&&(
+            <div style={{textAlign:"center",padding:"48px 0"}}>
+              <div style={{width:38,height:38,margin:"0 auto 18px",borderRadius:"50%",border:"2px solid rgba(124,111,205,0.2)",borderTop:"2px solid #7c6fcd",animation:"spin 1s linear infinite"}}/>
+              <p style={{fontSize:14,color:C.muted}}>Submitting your assessment...</p>
+            </div>
+          )}
+
+          {/* Confirmation */}
+          {submitted&&(
+            <div style={{textAlign:"center",padding:"10px 0",animation:"fadeUp .4s ease both"}}>
+              <div style={{width:50,height:50,margin:"0 auto 18px",borderRadius:"50%",border:"1px solid rgba(45,125,70,0.35)",background:"rgba(45,125,70,0.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>✓</div>
+              <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:23,marginBottom:10}}>Submission received.</h2>
+              <p style={{fontFamily:"'Playfair Display',serif",fontStyle:"italic",fontSize:15,color:C.muted,marginBottom:22,maxWidth:360,margin:"0 auto 22px"}}>
+                Your company has been seen by someone who knows what they're looking for.
+              </p>
+              <div style={{background:"rgba(255,255,255,0.02)",border:`1px solid ${C.border}`,borderRadius:8,padding:"16px 18px",textAlign:"left",marginBottom:14}}>
+                <p style={{fontSize:12,color:C.muted,lineHeight:2}}>
+                  <strong style={{color:"rgba(232,228,220,0.45)"}}>What happens next</strong><br/>
+                  1. Signals reviews your submission and documents<br/>
+                  2. First Look assessment is written and reviewed<br/>
+                  3. Report delivered to your email within 24 hours
+                  {cinMissing&&<><br/>4. ⚠ No CIN — assessed under Ideation Mode</>}
+                </p>
+              </div>
+              <p style={{fontSize:11,color:C.mutedLo}}>info@neuralsurface.com · Signals</p>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FileField({f,up,onChange,C}){
+  const ref=useRef(null);
+  return(
+    <div>
+      <div className="fzone" onClick={()=>ref.current?.click()} style={{borderColor:up?.url?"rgba(45,125,70,0.4)":up?.error?"rgba(233,69,96,0.3)":undefined}}>
+        <input ref={ref} type="file" className="fin" accept={f.accept} onChange={e=>e.target.files?.[0]&&onChange(e.target.files[0])}/>
+        {!up&&<p style={{fontSize:13,color:"rgba(232,228,220,0.28)"}}>📎 Click to upload {f.accept?.includes("pdf")?"PDF":"file"}</p>}
+        {up?.uploading&&<><div style={{width:18,height:18,margin:"0 auto 6px",borderRadius:"50%",border:"2px solid rgba(124,111,205,0.25)",borderTop:"2px solid #7c6fcd",animation:"spin 1s linear infinite"}}/><p style={{fontSize:12,color:"rgba(232,228,220,0.3)"}}>Uploading...</p></>}
+        {up?.url&&<div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span style={{color:"#2d7d46"}}>✓</span><span style={{fontSize:13,color:"#2d7d46"}}>{up.file.name}</span><span style={{fontSize:11,color:"rgba(232,228,220,0.22)"}}>— click to replace</span></div>}
+        {up?.error&&<p style={{fontSize:13,color:"#e94560"}}>{up.error} — click to retry</p>}
+      </div>
+    </div>
+  );
+}
+
+function Logo({sub}){
+  return(
+    <a href="index.html" style={{display:"flex",alignItems:"center",gap:11,textDecoration:"none"}}>
+      <div style={{width:29,height:29,background:"linear-gradient(135deg,#7c6fcd,#5a4fa8)",borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"white",fontFamily:"'Playfair Display',serif"}}>S</div>
+      <div>
+        <div style={{fontFamily:"'Playfair Display',serif",fontSize:14,fontWeight:600,color:"#1a1a2e"}}>Signals</div>
+        <div style={{fontSize:9,color:"#9896aa",letterSpacing:"1px",textTransform:"uppercase"}}>{sub}</div>
+      </div>
+    </a>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
