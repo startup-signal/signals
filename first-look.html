@@ -143,7 +143,7 @@ function App() {
   const login = async () => {
     if (!code.trim()) { setErr("Enter your access code."); return; }
     setLoading(true); setErr("");
-    const d = await api("/login", { accessCode: code.trim() });
+    const d = await api("/login", { accessCode: code.trim() }, { "X-Product": "first-look" });
     setLoading(false);
     if (d.error) { setErr(d.error); return; }
     setStartupInfo(d.startup);
