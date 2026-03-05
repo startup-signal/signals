@@ -19,34 +19,50 @@ const api = (path, body, extra={}) =>
     method:"POST", headers:{"Content-Type":"application/json",...extra}, body:JSON.stringify(body)
   }).then(r=>r.json());
 
-const uploadFile = async (file) => {
-  const fd = new FormData(); fd.append("file",file);
-  const res = await fetch(`${WORKER_URL}/upload`,{method:"POST",body:fd});
+// FIX 1: passes accessCode and fieldId for proper storage path
+const uploadFile = async (file, accessCode, fieldId) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("accessCode", accessCode || "unknown");
+  fd.append("fieldId", fieldId || "upload");
+  const res = await fetch(`${WORKER_URL}/upload`, { method:"POST", body:fd });
   const data = await res.json();
-  if(data.error) throw new Error(data.error);
+  if (data.error) throw new Error(data.error);
   return data.url;
 };
 
+// FIX 2: proper light-theme colours throughout
 const C = {
-  bg:"#f5f3ef", purple:"#5a4fa8", purpleDim:"rgba(90,79,168,0.08)",
-  purpleBorder:"rgba(90,79,168,0.2)", green:"#2d7d46", amber:"#FFC000",
-  red:"#e94560", text:"#1a1a2e", muted:"#5a5870",
-  mutedLo:"#9896aa", border:"rgba(26,26,46,0.1)",
-  card:"#ffffff",
+  bg:"#f5f3ef", card:"#ffffff",
+  text:"#1a1a2e", muted:"#5a5870", mutedLo:"#9896aa",
+  border:"rgba(26,26,46,0.1)",
+  purple:"#5a4fa8", purpleLight:"#7c6fcd",
+  purpleDim:"rgba(90,79,168,0.08)", purpleBorder:"rgba(90,79,168,0.2)",
+  green:"#2d7d46", greenDim:"rgba(45,125,70,0.08)", greenBorder:"rgba(45,125,70,0.2)",
+  amber:"#b45309", amberDim:"rgba(180,83,9,0.06)", amberBorder:"rgba(180,83,9,0.2)",
+  red:"#c0392b", redDim:"rgba(192,57,43,0.06)", redBorder:"rgba(192,57,43,0.2)",
 };
+
+const BAND = [
+  { label:"Pass",           color:"#c0392b", bg:"rgba(192,57,43,0.06)",  border:"rgba(192,57,43,0.22)"  },
+  { label:"Early Signal",   color:"#b45309", bg:"rgba(180,83,9,0.06)",   border:"rgba(180,83,9,0.22)"   },
+  { label:"Moderate Signal",color:"#5a4fa8", bg:"rgba(90,79,168,0.07)",  border:"rgba(90,79,168,0.22)"  },
+  { label:"High Signal",    color:"#2d7d46", bg:"rgba(45,125,70,0.07)",  border:"rgba(45,125,70,0.22)"  },
+  { label:"Strong Signal",  color:"#1a5c30", bg:"rgba(26,92,48,0.07)",   border:"rgba(26,92,48,0.22)"   },
+];
 
 const SECTIONS = [
   {
     id:"identity", title:"Company Identity", icon:"◈", compulsory:true,
     desc:"Verifiable company facts. CIN is required — My Signal is assessed against MCA data.",
     fields:[
-      {id:"Company Name", label:"Company Legal Name", type:"text", placeholder:"As registered with MCA", required:true},
-      {id:"Company URL", label:"Company Website URL", type:"text", placeholder:"https://yourcompany.com", required:true},
-      {id:"CIN", label:"CIN (Corporate Identity Number)", type:"text", placeholder:"e.g. U12345MH2022PTC000001", required:true,
+      {id:"Company Name",     label:"Company Legal Name",             type:"text",   placeholder:"As registered with MCA",            required:true},
+      {id:"Company URL",      label:"Company Website URL",            type:"text",   placeholder:"https://yourcompany.com",            required:true},
+      {id:"CIN",              label:"CIN (Corporate Identity Number)",type:"text",   placeholder:"e.g. U12345MH2022PTC000001",         required:true,
        hint:"Required. MCA data is the ground truth against which your submission is assessed."},
-      {id:"CoI Certificate", label:"Certificate of Incorporation", type:"file", accept:".pdf,.jpg,.png", required:true,
+      {id:"CoI Certificate",  label:"Certificate of Incorporation",   type:"file",   accept:".pdf,.jpg,.png", required:true,
        hint:"PDF or image — as issued by MCA"},
-      {id:"DPIIT Certificate", label:"DPIIT Recognition Certificate", type:"file", accept:".pdf,.jpg,.png", required:false,
+      {id:"DPIIT Certificate",label:"DPIIT Recognition Certificate",  type:"file",   accept:".pdf,.jpg,.png", required:false,
        hint:"Optional — attach if DPIIT recognised"},
     ]
   },
@@ -54,16 +70,16 @@ const SECTIONS = [
     id:"founders", title:"Founders", icon:"◉", compulsory:true,
     desc:"Founder details and LinkedIn profiles. LinkedIn PDF required for each named founder.",
     fields:[
-      {id:"Founder 1 Name", label:"Founder 1 Full Name", type:"text", placeholder:"Full name", required:true},
-      {id:"Founder 1 LinkedIn PDF", label:"Founder 1 LinkedIn Profile PDF", type:"file", accept:".pdf", required:true,
+      {id:"Founder 1 Name",        label:"Founder 1 Full Name",           type:"text", placeholder:"Full name",                    required:true},
+      {id:"Founder 1 LinkedIn PDF",label:"Founder 1 LinkedIn Profile PDF", type:"file", accept:".pdf", required:true,
        hint:"Save your LinkedIn profile as PDF — File → Print → Save as PDF"},
-      {id:"Founder 2 Name", label:"Founder 2 Full Name", type:"text", placeholder:"Leave blank if solo founder", required:false},
-      {id:"Founder 2 LinkedIn PDF", label:"Founder 2 LinkedIn PDF", type:"file", accept:".pdf", required:false,
+      {id:"Founder 2 Name",        label:"Founder 2 Full Name",           type:"text", placeholder:"Leave blank if solo founder",  required:false},
+      {id:"Founder 2 LinkedIn PDF",label:"Founder 2 LinkedIn PDF",         type:"file", accept:".pdf", required:false,
        hint:"Required if Founder 2 name is provided"},
-      {id:"Founder 3 Name", label:"Founder 3 Full Name", type:"text", placeholder:"Leave blank if not applicable", required:false},
-      {id:"Founder 3 LinkedIn PDF", label:"Founder 3 LinkedIn PDF", type:"file", accept:".pdf", required:false,
+      {id:"Founder 3 Name",        label:"Founder 3 Full Name",           type:"text", placeholder:"Leave blank if not applicable",required:false},
+      {id:"Founder 3 LinkedIn PDF",label:"Founder 3 LinkedIn PDF",         type:"file", accept:".pdf", required:false,
        hint:"Required if Founder 3 name is provided"},
-      {id:"Founders Full Time", label:"Are all founders working full-time?", type:"select",
+      {id:"Founders Full Time",    label:"Are all founders working full-time?", type:"select",
        options:["Yes — all founders full time","No — some founders part time","Solo founder — full time","Solo founder — part time"], required:true},
     ]
   },
@@ -72,14 +88,14 @@ const SECTIONS = [
     optionalNote:"Adding financials unlocks revenue signal and burn assessment.",
     desc:"Share what you can. Every data point narrows the assessment range.",
     fields:[
-      {id:"Annual Revenue (₹)", label:"Annual Revenue (₹)", type:"number", placeholder:"e.g. 2400000 for ₹24L", required:false,
+      {id:"Annual Revenue (₹)",  label:"Annual Revenue (₹)",         type:"number", placeholder:"e.g. 2400000 for ₹24L", required:false,
        hint:"Last 12 months, in Rupees"},
-      {id:"Monthly Revenue (₹)", label:"Current Monthly Revenue (₹)", type:"number", placeholder:"e.g. 200000 for ₹2L", required:false,
+      {id:"Monthly Revenue (₹)", label:"Current Monthly Revenue (₹)",type:"number", placeholder:"e.g. 200000 for ₹2L",  required:false,
        hint:"Most recent month"},
-      {id:"Revenue Proof", label:"Revenue Proof", type:"file", accept:".pdf,.jpg,.png,.xlsx,.csv", required:false,
+      {id:"Revenue Proof",       label:"Revenue Proof",               type:"file",   accept:".pdf,.jpg,.png,.xlsx,.csv", required:false,
        hint:"Audited statement, bank statement, or payment platform screenshot — Razorpay, Stripe, etc."},
-      {id:"Monthly Burn (₹)", label:"Monthly Burn Rate (₹)", type:"number", placeholder:"e.g. 300000 for ₹3L", required:false},
-      {id:"Runway (months)", label:"Runway (months)", type:"number", placeholder:"e.g. 14", required:false,
+      {id:"Monthly Burn (₹)",    label:"Monthly Burn Rate (₹)",       type:"number", placeholder:"e.g. 300000 for ₹3L", required:false},
+      {id:"Runway (months)",     label:"Runway (months)",             type:"number", placeholder:"e.g. 14",             required:false,
        hint:"Current cash / monthly burn"},
     ]
   },
@@ -88,9 +104,9 @@ const SECTIONS = [
     optionalNote:"Adding your pitch deck unlocks product, market, and deck rating.",
     desc:"Your pitch deck will be independently rated as part of the signal report.",
     fields:[
-      {id:"Pitch Deck", label:"Pitch Deck", type:"file", accept:".pdf,.pptx", required:false,
+      {id:"Pitch Deck",      label:"Pitch Deck",                        type:"file", accept:".pdf,.pptx", required:false,
        hint:"PDF preferred. Rated on clarity, market sizing, and investment readiness."},
-      {id:"Additional Docs", label:"Additional Supporting Documents", type:"file", accept:".pdf,.pptx,.xlsx,.docx", required:false,
+      {id:"Additional Docs", label:"Additional Supporting Documents",   type:"file", accept:".pdf,.pptx,.xlsx,.docx", required:false,
        hint:"Product demo, market research, financial projections — anything that strengthens the signal."},
     ]
   },
@@ -99,143 +115,167 @@ const SECTIONS = [
     optionalNote:"Adding traction URLs unlocks momentum signal.",
     desc:"URLs only — self-verifying evidence. No narrative needed.",
     fields:[
-      {id:"App Store URL", label:"App Store / Play Store URL", type:"text", placeholder:"https://play.google.com/...", required:false,
+      {id:"App Store URL",       label:"App Store / Play Store URL",     type:"text",     placeholder:"https://play.google.com/...", required:false,
        hint:"Downloads, ratings, and reviews are direct traction signals"},
-      {id:"Product Hunt URL", label:"Product Hunt or G2 / Capterra URL", type:"text", placeholder:"https://www.producthunt.com/...", required:false},
-      {id:"Press Coverage URLs", label:"Press / Media Coverage URLs", type:"textarea",
-       placeholder:"One URL per line — ET, YourStory, Inc42, TechCrunch...", required:false,
+      {id:"Product Hunt URL",    label:"Product Hunt or G2 / Capterra URL", type:"text",  placeholder:"https://www.producthunt.com/...", required:false},
+      {id:"Press Coverage URLs", label:"Press / Media Coverage URLs",    type:"textarea", placeholder:"One URL per line — ET, YourStory, Inc42, TechCrunch...", required:false,
        hint:"Third-party coverage is independently verifiable"},
-      {id:"Social Proof URLs", label:"Social Following URLs", type:"textarea",
-       placeholder:"LinkedIn company page, X/Twitter, Instagram...", required:false,
+      {id:"Social Proof URLs",   label:"Social Following URLs",          type:"textarea", placeholder:"LinkedIn company page, X/Twitter, Instagram...", required:false,
        hint:"Follower counts and engagement are momentum signals"},
-      {id:"Other Traction URLs", label:"Other Traction Evidence (URLs)", type:"textarea",
-       placeholder:"Partnerships, awards, accelerator selections...", required:false},
+      {id:"Other Traction URLs", label:"Other Traction Evidence (URLs)", type:"textarea", placeholder:"Partnerships, awards, accelerator selections...", required:false},
     ]
   },
 ];
 
 function App() {
-  const [view, setView] = useState("login");
-  const [code, setCode] = useState(""); const [err, setErr] = useState(""); const [loading, setLoading] = useState(false);
-  const [consent, setConsent] = useState(false);
+  const [view, setView]         = useState("login");
+  const [code, setCode]         = useState("");
+  const [err,  setErr]          = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [consent, setConsent]   = useState(false);
   const [startupInfo, setStartupInfo] = useState(null);
-  const submissionIdRef = useRef(null);
-  const [formData, setFormData] = useState({}); const [uploads, setUploads] = useState({});
-  const [step, setStep] = useState(0); const [stepErr, setStepErr] = useState("");
-  const [saving, setSaving] = useState(false); const [saveMsg, setSaveMsg] = useState("");
-  const [submitting, setSubmitting] = useState(false); const [submitted, setSubmitted] = useState(false);
+  const submissionIdRef         = useRef(null);
+  const [formData, setFormData] = useState({});
+  const [uploads,  setUploads]  = useState({});
+  const [step,     setStep]     = useState(0);
+  const [stepErr,  setStepErr]  = useState("");
+  const [saving,   setSaving]   = useState(false);
+  const [saveMsg,  setSaveMsg]  = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted,  setSubmitted]  = useState(false);
+  // FIX 3: quick verdict state
+  const [verdictLoading, setVerdictLoading] = useState(false);
+  const [verdict, setVerdict]   = useState(null);
 
+  // FIX 4: sends X-Product header to lock product on login
   const login = async () => {
-    if(!code.trim()){setErr("Enter your access code.");return;}
-    setLoading(true);setErr("");
-    const d = await api("/login",{accessCode:code.trim()});
+    if (!code.trim()) { setErr("Enter your access code."); return; }
+    setLoading(true); setErr("");
+    const d = await api("/login", { accessCode: code.trim() }, { "X-Product": "my-signal" });
     setLoading(false);
-    if(d.error){setErr(d.error);return;}
+    if (d.error) { setErr(d.error); return; }
     setStartupInfo(d.startup);
     submissionIdRef.current = d.submissionId;
-    const clean = {...(d.existingSubmission||{})};
+    const clean = { ...(d.existingSubmission || {}) };
     delete clean.Status; delete clean["Submitted At"];
     setFormData(clean);
     setView("form");
   };
 
   const save = useCallback(async (fields) => {
-    if(!startupInfo) return;
+    if (!startupInfo) return;
     setSaving(true);
-    const d = await api("/save",{accessCode:code, submissionId:submissionIdRef.current, fields});
-    if(d.submissionId && !submissionIdRef.current) submissionIdRef.current = d.submissionId;
-    setSaving(false); setSaveMsg("Saved ✓"); setTimeout(()=>setSaveMsg(""),2000);
-  },[code,startupInfo]);
+    const d = await api("/save", { accessCode:code, submissionId:submissionIdRef.current, fields });
+    if (d.submissionId && !submissionIdRef.current) submissionIdRef.current = d.submissionId;
+    setSaving(false); setSaveMsg("Saved ✓"); setTimeout(() => setSaveMsg(""), 2000);
+  }, [code, startupInfo]);
 
-  useEffect(()=>{
-    if(view==="form"&&step>0&&step<=SECTIONS.length&&Object.keys(formData).length>0){
-      const t=setTimeout(()=>save(formData),1500); return ()=>clearTimeout(t);
+  useEffect(() => {
+    if (view==="form" && step>0 && step<=SECTIONS.length && Object.keys(formData).length>0) {
+      const t = setTimeout(() => save(formData), 1500);
+      return () => clearTimeout(t);
     }
-  },[formData,step]);
+  }, [formData, step]);
 
-  const set = (id,val) => setFormData(p=>({...p,[id]:val}));
+  const set = (id, val) => setFormData(p => ({ ...p, [id]: val }));
 
-  const handleFile = async (id,file) => {
-    if(!file) return;
-    setUploads(p=>({...p,[id]:{file,uploading:true,url:null,error:null}}));
+  // FIX 5: passes code and fieldId to uploadFile
+  const handleFile = async (id, file) => {
+    if (!file) return;
+    setUploads(p => ({ ...p, [id]: { file, uploading:true, url:null, error:null } }));
     try {
-      const url = await uploadFile(file);
-      setUploads(p=>({...p,[id]:{file,uploading:false,url,error:null}}));
-      set(id,url);
+      const url = await uploadFile(file, code, id);
+      setUploads(p => ({ ...p, [id]: { file, uploading:false, url, error:null } }));
+      set(id, url);
     } catch(e) {
-      setUploads(p=>({...p,[id]:{file,uploading:false,url:null,error:"Upload failed — try again"}}));
+      setUploads(p => ({ ...p, [id]: { file, uploading:false, url:null, error:"Upload failed — try again" } }));
     }
   };
 
   const next = () => {
     setStepErr("");
     const sec = SECTIONS[step-1];
-    if(sec?.compulsory){
-      const errs=[];
-      sec.fields.forEach(f=>{
-        if(f.required){
-          if(f.type==="file"){if(!uploads[f.id]?.url)errs.push(f.label);}
-          else{if(!formData[f.id]||String(formData[f.id]).trim()==="")errs.push(f.label);}
+    if (sec?.compulsory) {
+      const errs = [];
+      sec.fields.forEach(f => {
+        if (f.required) {
+          if (f.type==="file") { if (!uploads[f.id]?.url) errs.push(f.label); }
+          else { if (!formData[f.id] || String(formData[f.id]).trim()==="") errs.push(f.label); }
         }
       });
-      if(sec.id==="founders"){
-        if(formData["Founder 2 Name"]?.trim()&&!uploads["Founder 2 LinkedIn PDF"]?.url)errs.push("Founder 2 LinkedIn PDF");
-        if(formData["Founder 3 Name"]?.trim()&&!uploads["Founder 3 LinkedIn PDF"]?.url)errs.push("Founder 3 LinkedIn PDF");
+      if (sec.id==="founders") {
+        if (formData["Founder 2 Name"]?.trim() && !uploads["Founder 2 LinkedIn PDF"]?.url) errs.push("Founder 2 LinkedIn PDF");
+        if (formData["Founder 3 Name"]?.trim() && !uploads["Founder 3 LinkedIn PDF"]?.url) errs.push("Founder 3 LinkedIn PDF");
       }
-      if(errs.length>0){setStepErr("Required: "+errs.join(", "));return;}
+      if (errs.length > 0) { setStepErr("Required: " + errs.join(", ")); return; }
     }
-    setStep(s=>s+1);
+    setStep(s => s+1);
   };
 
   const submit = async () => {
     setSubmitting(true);
-    await save({...formData,Status:"Submitted"});
-    setTimeout(()=>{setSubmitting(false);setSubmitted(true);},1600);
+    await save({ ...formData, Status:"Submitted" });
+    setSubmitting(false);
+    setSubmitted(true);
+    // FIX 6: trigger quick verdict after submission
+    if (submissionIdRef.current) {
+      setVerdictLoading(true);
+      try {
+        const d = await api("/generate-quick", { submissionId: submissionIdRef.current });
+        if (d.verdict) setVerdict(d);
+      } catch(e) { /* fail silently */ }
+      setVerdictLoading(false);
+    }
   };
 
-  const sec = step>=1&&step<=SECTIONS.length ? SECTIONS[step-1] : null;
+  const sec = step>=1 && step<=SECTIONS.length ? SECTIONS[step-1] : null;
 
   const GS = `
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500;600&display=swap');
     *{box-sizing:border-box;margin:0;padding:0;}
     @keyframes spin{to{transform:rotate(360deg)}}
     @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.45}}
     .inp{width:100%;background:#ffffff;border:1px solid rgba(26,26,46,0.15);border-radius:7px;color:#1a1a2e;font-family:'Source Sans 3',sans-serif;font-size:15px;padding:11px 14px;outline:none;transition:border-color .2s;}
-    .inp:focus{border-color:#5a4fa8;box-shadow:0 0 0 3px rgba(90,79,168,0.08)}.inp::placeholder{color:#9896aa}
-    select.inp option{background:#ffffff;color:#1a1a2e} textarea.inp{resize:vertical}
-    .btn{border:none;border-radius:7px;cursor:pointer;font-family:'Source Sans 3',sans-serif;font-size:14px;font-weight:500;padding:11px 20px;transition:opacity .18s;}
-    .btn:hover{opacity:.84}.btn:disabled{opacity:.33;cursor:not-allowed}
-    .fzone{border:1px dashed rgba(26,26,46,0.2);border-radius:7px;padding:16px;cursor:pointer;transition:border-color .2s;text-align:center;}
-    .fzone:hover{border-color:#5a4fa8}.fin{display:none}
+    .inp:focus{border-color:#5a4fa8;box-shadow:0 0 0 3px rgba(90,79,168,0.08)}
+    .inp::placeholder{color:#9896aa}
+    select.inp{color:#1a1a2e;background:#ffffff;}
+    select.inp option{background:#ffffff;color:#1a1a2e}
+    textarea.inp{resize:vertical}
+    .btn{border:none;border-radius:7px;cursor:pointer;font-family:'Source Sans 3',sans-serif;font-size:14px;font-weight:600;padding:11px 20px;transition:opacity .18s;}
+    .btn:hover{opacity:.82}.btn:disabled{opacity:.3;cursor:not-allowed}
+    .fzone{border:1px dashed rgba(26,26,46,0.2);border-radius:7px;padding:16px;cursor:pointer;transition:border-color .2s;text-align:center;background:#fafafa;}
+    .fzone:hover{border-color:#5a4fa8;background:#f7f5ff;}
+    .fin{display:none}
     .ai{animation:fadeUp .3s ease both}
+    label{color:#1a1a2e}
   `;
 
-  const page={minHeight:"100vh",background:C.bg,color:C.text,fontFamily:"'Source Sans 3',sans-serif",display:"flex",flexDirection:"column"};
-  const hdr={borderBottom:`1px solid ${C.border}`,padding:"15px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(245,243,239,0.94)",backdropFilter:"blur(16px)"};
-  const main={flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"40px 20px"};
-  const card={width:"100%",maxWidth:540,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"34px 30px"};
+  const page = {minHeight:"100vh",background:C.bg,color:C.text,fontFamily:"'Source Sans 3',sans-serif",display:"flex",flexDirection:"column"};
+  const hdr  = {borderBottom:`1px solid ${C.border}`,padding:"15px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(245,243,239,0.94)",backdropFilter:"blur(16px)",position:"sticky",top:0,zIndex:100};
+  const main = {flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"40px 20px"};
+  const card = {width:"100%",maxWidth:540,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"34px 30px",boxShadow:"0 1px 4px rgba(26,26,46,0.06)"};
 
-  if(view==="login") return (
+  // ── LOGIN VIEW ──────────────────────────────────────────────
+  if (view==="login") return (
     <div style={page}><style>{GS}</style>
       <div style={hdr}>
-        <Logo sub="My Signal"/>
+        <Logo sub="My Signal" />
         <nav style={{display:"flex",alignItems:"center",gap:4}}>
-          <a href="first-look.html" style={{fontSize:14,color:C.muted,textDecoration:"none",padding:"7px 14px",borderRadius:6,border:"1px solid transparent",fontWeight:500}}>First Look</a>
-          <a href="my-signal.html" style={{fontSize:14,color:C.purple,textDecoration:"none",padding:"7px 14px",borderRadius:6,background:C.purpleDim,border:`1px solid ${C.purpleBorder}`,fontWeight:600}}>My Signal</a>
-          <a href="pricing.html" style={{fontSize:14,color:C.muted,textDecoration:"none",padding:"7px 14px",borderRadius:6,border:"1px solid transparent",fontWeight:500}}>Pricing</a>
+          <NavLink href="first-look.html" label="First Look" C={C}/>
+          <NavLink href="my-signal.html"  label="My Signal"  active C={C}/>
+          <NavLink href="pricing.html"    label="Pricing"    C={C}/>
           <a href="mailto:info@neuralsurface.com" style={{fontSize:14,color:C.purple,textDecoration:"none",padding:"7px 16px",borderRadius:6,background:C.purpleDim,border:`1px solid ${C.purpleBorder}`,fontWeight:600,marginLeft:4}}>Get access →</a>
         </nav>
       </div>
       <div style={main}>
-        <div style={{width:"100%",maxWidth:720,display:"flex",gap:20,alignItems:"flex-start"}} className="ai">
+        <div style={{width:"100%",maxWidth:720,display:"flex",gap:18,alignItems:"flex-start"}} className="ai">
 
           {/* Login card */}
-          <div style={{flex:"0 0 300px",background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"28px 26px",boxShadow:"0 1px 4px rgba(26,26,46,0.06)"}}>
-            <div style={{marginBottom:22}}>
-              <div style={{fontSize:10,letterSpacing:"1.4px",textTransform:"uppercase",color:C.purple,marginBottom:10,fontWeight:600}}>My Signal · ISS v20.1</div>
-              <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,marginBottom:8,color:C.text}}>My gaps. My next move.</h2>
-              <p style={{fontSize:14,color:C.muted,lineHeight:1.72}}>Full signal assessment benchmarked against 18,568 market transactions.</p>
-            </div>
+          <div style={{flex:"0 0 288px",background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"28px 24px",boxShadow:"0 1px 4px rgba(26,26,46,0.06)"}}>
+            <div style={{fontSize:10,letterSpacing:"1.4px",textTransform:"uppercase",color:C.purple,marginBottom:10,fontWeight:600}}>My Signal · ISS v20.1</div>
+            <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,marginBottom:8,color:C.text}}>My gaps. My next move.</h2>
+            <p style={{fontSize:14,color:C.muted,lineHeight:1.72,marginBottom:20}}>Full signal assessment benchmarked against 18,568 market transactions.</p>
             <div style={{background:C.purpleDim,border:`1px solid ${C.purpleBorder}`,borderRadius:8,padding:"12px 14px",marginBottom:20}}>
               <p style={{fontSize:13,color:C.muted,lineHeight:1.75}}>
                 <strong style={{color:C.text}}>No access code?</strong><br/>
@@ -243,8 +283,10 @@ function App() {
               </p>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              <input className="inp" placeholder="Enter your access code" value={code} onChange={e=>setCode(e.target.value)} onKeyDown={e=>e.key==="Enter"&&login()}/>
-              <button className="btn" onClick={login} disabled={loading} style={{background:"linear-gradient(135deg,#5a4fa8,#7c6fcd)",color:"white",fontSize:15,padding:"12px 20px"}}>
+              <input className="inp" placeholder="Enter your access code" value={code}
+                onChange={e=>setCode(e.target.value)} onKeyDown={e=>e.key==="Enter"&&login()}/>
+              <button className="btn" onClick={login} disabled={loading}
+                style={{background:"linear-gradient(135deg,#5a4fa8,#7c6fcd)",color:"white",fontSize:15,padding:"12px 20px"}}>
                 {loading?"Verifying...":"Begin My Signal →"}
               </button>
             </div>
@@ -254,33 +296,27 @@ function App() {
             </p>
           </div>
 
-          {/* What you get */}
-          <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"28px 26px",boxShadow:"0 1px 4px rgba(26,26,46,0.06)"}}>
+          {/* What you receive */}
+          <div style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"28px 24px",boxShadow:"0 1px 4px rgba(26,26,46,0.06)"}}>
             <div style={{fontSize:10,letterSpacing:"1.4px",textTransform:"uppercase",color:C.mutedLo,marginBottom:6,fontWeight:600}}>What you receive</div>
-            <div style={{fontSize:13,color:C.mutedLo,marginBottom:20,lineHeight:1.6}}>Free 100-word findings report on every complete submission. Full PDF report for ₹4,999, delivered within 24 hrs of payment.</div>
+            <div style={{fontSize:13,color:C.mutedLo,marginBottom:18,lineHeight:1.65}}>Free 100-word findings on every complete submission. Full PDF for ₹4,999, within 24 hrs.</div>
             {[
-              ["A scored verdict across every signal dimension","Full depth across all scored dimensions — benchmarked against 18,568 market transactions at your stage and sector."],
+              ["A scored verdict across every signal dimension","Full depth across all scored dimensions — benchmarked against 18,568 transactions at your stage and sector."],
               ["Ranked gaps — what's holding the score back","Not a list of things to do. A ranked read on what's structurally weak, what's fixable, and in what order."],
-              ["Exact next steps before your next raise or pitch","Specific, prioritised actions — the ones that move the score and the ones that matter to investors at your stage."],
-              ["Bear, base and bull case — what moves your number","The conditions that would push the score up or down. Gives you a clear target to aim for before the next conversation."],
-            ].map(([title, desc]) => (
-              <div key={title} style={{display:"flex",gap:11,marginBottom:15}}>
-                <div style={{width:5,height:5,borderRadius:"50%",background:C.purple,marginTop:7,flexShrink:0,opacity:0.4}}/>
+              ["Exact next steps before your next raise or pitch","Specific, prioritised actions — the ones that move the score and matter to investors at your stage."],
+              ["Bear, base and bull case — what moves your number","The conditions that push the score up or down. A clear target before the next conversation."],
+            ].map(([title,desc])=>(
+              <div key={title} style={{display:"flex",gap:10,marginBottom:13}}>
+                <div style={{width:5,height:5,borderRadius:"50%",background:C.purple,marginTop:7,flexShrink:0,opacity:0.45}}/>
                 <div>
-                  <div style={{fontSize:14,fontWeight:600,color:C.text,marginBottom:3}}>{title}</div>
-                  <div style={{fontSize:13,color:C.muted,lineHeight:1.65}}>{desc}</div>
+                  <div style={{fontSize:14,fontWeight:600,color:C.text,marginBottom:2}}>{title}</div>
+                  <div style={{fontSize:13,color:C.muted,lineHeight:1.6}}>{desc}</div>
                 </div>
               </div>
             ))}
-            <div style={{marginTop:16,paddingTop:14,borderTop:`1px solid ${C.border}`,display:"flex",gap:8}}>
-              <div style={{flex:1,background:"rgba(30,107,58,0.07)",border:"1px solid rgba(30,107,58,0.18)",borderRadius:7,padding:"10px 12px",textAlign:"center"}}>
-                <div style={{fontSize:12,fontWeight:700,color:"#1e6b3a"}}>Free</div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2}}>100-word findings report</div>
-              </div>
-              <div style={{flex:1,background:C.purpleDim,border:`1px solid ${C.purpleBorder}`,borderRadius:7,padding:"10px 12px",textAlign:"center"}}>
-                <div style={{fontSize:12,fontWeight:700,color:C.purple}}>₹4,999</div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2}}>Full report · PDF · 24 hr delivery</div>
-              </div>
+            <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`,display:"flex",gap:8}}>
+              <PriceBadge label="Free"   sub="100-word findings" color="#1e6b3a" bg="rgba(30,107,58,0.07)" border="rgba(30,107,58,0.18)" />
+              <PriceBadge label="₹4,999" sub="Full PDF · 24 hr"  color={C.purple} bg={C.purpleDim} border={C.purpleBorder} />
             </div>
           </div>
 
@@ -289,94 +325,101 @@ function App() {
     </div>
   );
 
+  // ── FORM VIEW ───────────────────────────────────────────────
   return (
     <div style={page}><style>{GS}</style>
       <div style={hdr}>
-        <Logo sub="My Signal"/>
+        <Logo sub="My Signal" />
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           <nav style={{display:"flex",alignItems:"center",gap:4}}>
-            <a href="first-look.html" style={{fontSize:13,color:C.muted,textDecoration:"none",padding:"6px 12px",borderRadius:6,border:"1px solid transparent",fontWeight:500}}>First Look</a>
-            <a href="my-signal.html" style={{fontSize:13,color:C.purple,textDecoration:"none",padding:"6px 12px",borderRadius:6,background:C.purpleDim,border:`1px solid ${C.purpleBorder}`,fontWeight:600}}>My Signal</a>
-            <a href="pricing.html" style={{fontSize:13,color:C.muted,textDecoration:"none",padding:"6px 12px",borderRadius:6,border:"1px solid transparent",fontWeight:500}}>Pricing</a>
+            <NavLink href="first-look.html" label="First Look" C={C} small/>
+            <NavLink href="my-signal.html"  label="My Signal"  active C={C} small/>
+            <NavLink href="pricing.html"    label="Pricing"    C={C} small/>
           </nav>
-          {saving&&<span style={{fontSize:12,color:C.muted}}>Saving...</span>}
-          {saveMsg&&<span style={{fontSize:12,color:C.green}}>{saveMsg}</span>}
-          {step>=1&&step<=SECTIONS.length&&(
-            <div style={{display:"flex",alignItems:"center",gap:9}}>
-              <div style={{width:96,height:2,background:C.border,borderRadius:1,overflow:"hidden"}}>
-                <div style={{width:`${Math.round((step/SECTIONS.length)*100)}%`,height:"100%",background:"linear-gradient(90deg,#7c6fcd,#a08ef0)",borderRadius:1,transition:"width .3s"}}/>
+          {saving  && <span style={{fontSize:12,color:C.muted}}>Saving...</span>}
+          {saveMsg && <span style={{fontSize:12,color:C.green}}>{saveMsg}</span>}
+          {step>=1 && step<=SECTIONS.length && (
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:88,height:2,background:C.border,borderRadius:1,overflow:"hidden"}}>
+                <div style={{width:`${Math.round((step/SECTIONS.length)*100)}%`,height:"100%",background:"linear-gradient(90deg,#7c6fcd,#a08ef0)",transition:"width .3s"}}/>
               </div>
               <span style={{fontSize:12,color:C.muted}}>{step}/{SECTIONS.length}</span>
             </div>
           )}
         </div>
       </div>
+
       <div style={main}>
         <div style={card} className="ai">
 
-          {step===0&&(
+          {/* ── Step 0: Welcome + consent ── */}
+          {step===0 && (
             <div>
-              <div style={{fontSize:10,letterSpacing:"1.4px",textTransform:"uppercase",color:C.purple,marginBottom:14}}>My Signal — Assessment</div>
-              <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:23,marginBottom:9}}>
-                {startupInfo?.name?`Welcome, ${startupInfo.name}`:"Let's begin."}
+              <div style={{fontSize:10,letterSpacing:"1.4px",textTransform:"uppercase",color:C.purple,marginBottom:14,fontWeight:600}}>My Signal — Assessment</div>
+              <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:23,marginBottom:9,color:C.text}}>
+                {startupInfo?.name ? `Welcome, ${startupInfo.name}` : "Let's begin."}
               </h2>
-              <p style={{fontSize:13,color:C.muted,lineHeight:1.72,marginBottom:22}}>
+              <p style={{fontSize:13,color:C.muted,lineHeight:1.72,marginBottom:20}}>
                 <strong style={{color:C.text}}>5 sections.</strong> The first two are required. Every additional section you complete strengthens your signal depth.
               </p>
-              <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:22}}>
+              <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:20}}>
                 {SECTIONS.map(s=>(
-                  <div key={s.id} style={{display:"flex",alignItems:"center",gap:11,padding:"9px 13px",background:"rgba(255,255,255,0.02)",border:`1px solid ${C.border}`,borderRadius:7}}>
+                  <div key={s.id} style={{display:"flex",alignItems:"center",gap:11,padding:"9px 13px",background:"rgba(90,79,168,0.03)",border:`1px solid ${C.border}`,borderRadius:7}}>
                     <span style={{fontSize:15,color:C.purple,width:18}}>{s.icon}</span>
                     <div style={{flex:1}}>
-                      <span style={{fontSize:13,color:C.text}}>{s.title}</span>
+                      <span style={{fontSize:13,color:C.text,fontWeight:500}}>{s.title}</span>
                       {s.optionalNote&&<span style={{fontSize:11,color:C.muted,marginLeft:7}}>— {s.optionalNote}</span>}
                     </div>
                     {s.compulsory
-                      ?<span style={{fontSize:10,background:"rgba(233,69,96,0.1)",color:C.red,borderRadius:3,padding:"2px 7px"}}>Required</span>
-                      :<span style={{fontSize:10,background:C.purpleDim,color:C.purple,borderRadius:3,padding:"2px 7px"}}>Optional</span>
+                      ?<span style={{fontSize:10,background:C.redDim,color:C.red,borderRadius:3,padding:"2px 7px",fontWeight:600,border:`1px solid ${C.redBorder}`}}>Required</span>
+                      :<span style={{fontSize:10,background:C.purpleDim,color:C.purple,borderRadius:3,padding:"2px 7px",fontWeight:600,border:`1px solid ${C.purpleBorder}`}}>Optional</span>
                     }
                   </div>
                 ))}
               </div>
-              <div style={{background:"rgba(255,255,255,0.02)",border:`1px solid ${C.border}`,borderRadius:8,padding:"14px 16px",marginBottom:20}}>
-                <p style={{fontSize:12,color:"rgba(232,228,220,0.45)",lineHeight:1.8,marginBottom:11}}>
-                  <strong style={{color:C.muted}}>Declaration:</strong> I confirm I am authorised to share these materials; the information is accurate to the best of my knowledge; I consent to Signals using this data solely to generate this assessment. This report does not constitute investment advice.
+              <div style={{background:"rgba(26,26,46,0.02)",border:`1px solid ${C.border}`,borderRadius:8,padding:"14px 16px",marginBottom:20}}>
+                <p style={{fontSize:12,color:C.muted,lineHeight:1.8,marginBottom:11}}>
+                  <strong style={{color:C.text}}>Declaration:</strong> I confirm I am authorised to share these materials; the information is accurate to the best of my knowledge; I consent to Signals using this data solely to generate this assessment. This report does not constitute investment advice.
                 </p>
                 <label style={{display:"flex",alignItems:"flex-start",gap:9,cursor:"pointer"}}>
-                  <input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} style={{marginTop:2,width:14,height:14,accentColor:C.purple,flexShrink:0}}/>
+                  <input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}
+                    style={{marginTop:2,width:14,height:14,accentColor:C.purple,flexShrink:0}}/>
                   <span style={{fontSize:13,color:C.text,lineHeight:1.5}}>I confirm and consent.</span>
                 </label>
               </div>
               <button className="btn" onClick={()=>{if(consent)setStep(1);}} disabled={!consent}
-                style={{background:consent?"linear-gradient(135deg,#7c6fcd,#5a4fa8)":"rgba(255,255,255,0.05)",color:"white",width:"100%",fontSize:15,padding:"13px"}}>
+                style={{background:consent?"linear-gradient(135deg,#5a4fa8,#7c6fcd)":"rgba(26,26,46,0.06)",color:consent?"white":C.muted,width:"100%",fontSize:15,padding:"13px"}}>
                 Begin →
               </button>
             </div>
           )}
 
-          {step>=1&&step<=SECTIONS.length&&sec&&(
+          {/* ── Steps 1–5: Section fields ── */}
+          {step>=1 && step<=SECTIONS.length && sec && (
             <div>
-              <div style={{marginBottom:22}}>
+              <div style={{marginBottom:20}}>
                 <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:7}}>
                   <span style={{fontSize:19,color:C.purple}}>{sec.icon}</span>
-                  <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21}}>{sec.title}</h2>
+                  <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:21,color:C.text}}>{sec.title}</h2>
                   {sec.compulsory
-                    ?<span style={{fontSize:10,background:"rgba(233,69,96,0.1)",color:C.red,borderRadius:3,padding:"2px 7px"}}>Required</span>
-                    :<span style={{fontSize:10,background:C.purpleDim,color:C.purple,borderRadius:3,padding:"2px 7px"}}>Optional</span>
+                    ?<span style={{fontSize:10,background:C.redDim,color:C.red,borderRadius:3,padding:"2px 7px",fontWeight:600,border:`1px solid ${C.redBorder}`}}>Required</span>
+                    :<span style={{fontSize:10,background:C.purpleDim,color:C.purple,borderRadius:3,padding:"2px 7px",fontWeight:600,border:`1px solid ${C.purpleBorder}`}}>Optional</span>
                   }
                 </div>
                 <p style={{fontSize:13,color:C.muted,lineHeight:1.62}}>
-                  {sec.optionalNote?<span style={{color:"rgba(160,142,240,0.8)"}}>{sec.optionalNote}</span>:sec.desc}
+                  {sec.optionalNote
+                    ?<span style={{color:C.purple,opacity:0.85}}>{sec.optionalNote}</span>
+                    :sec.desc}
                 </p>
               </div>
 
               <div style={{display:"flex",flexDirection:"column",gap:17}}>
                 {sec.fields.map(f=>(
                   <div key={f.id}>
-                    <label style={{display:"block",marginBottom:5,fontSize:13,fontWeight:500,color:"rgba(232,228,220,0.68)"}}>
+                    <label style={{display:"block",marginBottom:5,fontSize:13,fontWeight:600,color:C.text}}>
                       {f.label}
-                      {f.required&&<span style={{color:C.red,marginLeft:3}}>*</span>}
-                      {!f.required&&f.type!=="file"&&<span style={{fontSize:10,background:C.purpleDim,color:C.purple,borderRadius:3,padding:"1px 6px",marginLeft:7}}>optional</span>}
+                      {f.required && <span style={{color:C.red,marginLeft:3}}>*</span>}
+                      {!f.required && f.type!=="file" && <span style={{fontSize:10,background:C.purpleDim,color:C.purple,borderRadius:3,padding:"1px 6px",marginLeft:7,fontWeight:500}}>optional</span>}
                     </label>
                     {f.type==="file"
                       ?<FileField f={f} up={uploads[f.id]} onChange={file=>handleFile(f.id,file)} C={C}/>
@@ -384,51 +427,105 @@ function App() {
                         ?<textarea className="inp" rows={3} placeholder={f.placeholder} value={formData[f.id]||""} onChange={e=>set(f.id,e.target.value)}/>
                         :f.type==="select"
                           ?<select className="inp" value={formData[f.id]||""} onChange={e=>set(f.id,e.target.value)}>
-                              <option value="">Select...</option>
-                              {f.options.map(o=><option key={o} value={o}>{o}</option>)}
-                            </select>
+                             <option value="">Select...</option>
+                             {f.options.map(o=><option key={o} value={o}>{o}</option>)}
+                           </select>
                           :<input className="inp" type={f.type==="number"?"number":"text"} placeholder={f.placeholder}
-                              value={formData[f.id]??""} onChange={e=>set(f.id,f.type==="number"?parseFloat(e.target.value)||"":e.target.value)}/>
+                             value={formData[f.id]??""} onChange={e=>set(f.id,f.type==="number"?parseFloat(e.target.value)||"":e.target.value)}/>
                     }
-                    {f.hint&&<p style={{fontSize:11,color:C.muted,marginTop:4,lineHeight:1.6}}>{f.hint}</p>}
+                    {f.hint && <p style={{fontSize:11,color:C.mutedLo,marginTop:4,lineHeight:1.6}}>{f.hint}</p>}
                   </div>
                 ))}
               </div>
 
-              {stepErr&&<div style={{marginTop:14,padding:"9px 13px",background:"rgba(233,69,96,0.07)",border:"1px solid rgba(233,69,96,0.18)",borderRadius:7}}><p style={{fontSize:12,color:C.red}}>{stepErr}</p></div>}
+              {stepErr && (
+                <div style={{marginTop:14,padding:"9px 13px",background:C.redDim,border:`1px solid ${C.redBorder}`,borderRadius:7}}>
+                  <p style={{fontSize:12,color:C.red}}>{stepErr}</p>
+                </div>
+              )}
 
               <div style={{display:"flex",gap:10,marginTop:26}}>
-                <button className="btn" onClick={()=>{setStepErr("");setStep(s=>s-1);}} style={{background:"rgba(255,255,255,0.05)",color:C.text,border:`1px solid ${C.border}`}}>← Back</button>
+                <button className="btn" onClick={()=>{setStepErr("");setStep(s=>s-1);}}
+                  style={{background:"rgba(26,26,46,0.05)",color:C.text,border:`1px solid ${C.border}`}}>← Back</button>
                 {step<SECTIONS.length
-                  ?<button className="btn" onClick={next} style={{background:"linear-gradient(135deg,#7c6fcd,#5a4fa8)",color:"white",flex:1}}>Save & Continue →</button>
-                  :<button className="btn" onClick={submit} style={{background:"linear-gradient(135deg,#2d7d46,#1a5c30)",color:"white",flex:1}}>Submit for Assessment ✦</button>
+                  ?<button className="btn" onClick={next}
+                     style={{background:"linear-gradient(135deg,#5a4fa8,#7c6fcd)",color:"white",flex:1}}>Save & Continue →</button>
+                  :<button className="btn" onClick={submit} disabled={submitting}
+                     style={{background:"linear-gradient(135deg,#1e6b3a,#2d7d46)",color:"white",flex:1}}>Submit for Assessment ✦</button>
                 }
               </div>
             </div>
           )}
 
-          {submitting&&!submitted&&(
+          {/* ── Submitting spinner ── */}
+          {submitting && (
             <div style={{textAlign:"center",padding:"48px 0"}}>
-              <div style={{width:38,height:38,margin:"0 auto 18px",borderRadius:"50%",border:"2px solid rgba(124,111,205,0.2)",borderTop:"2px solid #7c6fcd",animation:"spin 1s linear infinite"}}/>
+              <div style={{width:38,height:38,margin:"0 auto 18px",borderRadius:"50%",border:"2px solid rgba(90,79,168,0.15)",borderTop:"2px solid #5a4fa8",animation:"spin 1s linear infinite"}}/>
               <p style={{fontSize:14,color:C.muted}}>Submitting your assessment...</p>
             </div>
           )}
 
-          {/* The emotional peak */}
-          {submitted&&(
-            <div style={{textAlign:"center",padding:"10px 0",animation:"fadeUp .4s ease both"}}>
-              <div style={{width:50,height:50,margin:"0 auto 18px",borderRadius:"50%",border:"1px solid rgba(124,111,205,0.35)",background:"rgba(124,111,205,0.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:C.purple}}>◈</div>
-              <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:23,marginBottom:6}}>Submitted.</h2>
-              <p style={{fontFamily:"'Playfair Display',serif",fontStyle:"italic",fontSize:15,color:C.muted,marginBottom:22}}>You're about to find out exactly where you stand.</p>
-              <div style={{background:"rgba(255,255,255,0.02)",border:`1px solid ${C.border}`,borderRadius:8,padding:"16px 18px",textAlign:"left",marginBottom:14}}>
-                <p style={{fontSize:12,color:C.muted,lineHeight:2}}>
-                  <strong style={{color:"rgba(232,228,220,0.45)"}}>What happens next</strong><br/>
-                  1. Signals reviews your submission against ISS v20.1<br/>
-                  2. Your signal report is written — gaps, next moves, pitch deck rating<br/>
-                  3. Report delivered to your email within 24 hours
+          {/* ── Submitted: confirmation + quick verdict ── */}
+          {submitted && !submitting && (
+            <div style={{animation:"fadeUp .4s ease both"}}>
+
+              {/* Confirmation header */}
+              <div style={{textAlign:"center",marginBottom:24}}>
+                <div style={{width:50,height:50,margin:"0 auto 16px",borderRadius:"50%",border:`1px solid ${C.purpleBorder}`,background:C.purpleDim,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:C.purple}}>◈</div>
+                <h2 style={{fontFamily:"'Playfair Display',serif",fontSize:23,marginBottom:9,color:C.text}}>Submitted.</h2>
+                <p style={{fontFamily:"'Playfair Display',serif",fontStyle:"italic",fontSize:15,color:C.muted,maxWidth:340,margin:"0 auto"}}>
+                  You're about to find out exactly where you stand.
                 </p>
               </div>
-              <p style={{fontSize:11,color:C.mutedLo}}>info@neuralsurface.com · Signals</p>
+
+              {/* Quick verdict — loading */}
+              {verdictLoading && (
+                <div style={{background:C.purpleDim,border:`1px solid ${C.purpleBorder}`,borderRadius:10,padding:"20px",textAlign:"center",marginBottom:20}}>
+                  <div style={{width:22,height:22,margin:"0 auto 10px",borderRadius:"50%",border:"2px solid rgba(90,79,168,0.2)",borderTop:"2px solid #5a4fa8",animation:"spin 1s linear infinite"}}/>
+                  <p style={{fontSize:13,color:C.muted,animation:"pulse 1.6s ease infinite"}}>Running your assessment — about 30 seconds...</p>
+                </div>
+              )}
+
+              {/* Quick verdict — result */}
+              {verdict && !verdictLoading && (() => {
+                const b = BAND[Math.min(verdict.verdict_band ?? 1, 4)];
+                return (
+                  <div style={{border:`1px solid ${b.border}`,background:b.bg,borderRadius:12,padding:"20px 18px",marginBottom:20,animation:"fadeUp .4s ease both"}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:13}}>
+                      <span style={{fontSize:10,letterSpacing:"1.3px",textTransform:"uppercase",color:C.mutedLo,fontWeight:600}}>Quick Verdict</span>
+                      <span style={{fontSize:12,fontWeight:700,color:b.color,background:"white",padding:"3px 12px",borderRadius:20,border:`1px solid ${b.border}`}}>{b.label}</span>
+                    </div>
+                    <p style={{fontSize:15,color:C.text,lineHeight:1.7,marginBottom:14,fontWeight:500}}>{verdict.verdict}</p>
+                    {verdict.green_flags?.slice(0,2).map((f,i)=>(
+                      <div key={i} style={{display:"flex",gap:9,marginBottom:7,alignItems:"flex-start"}}>
+                        <span style={{color:C.green,fontSize:12,flexShrink:0,marginTop:2,fontWeight:700}}>↑</span>
+                        <span style={{fontSize:13,color:C.text,lineHeight:1.5}}><strong>{f.flag}</strong> — {f.evidence}</span>
+                      </div>
+                    ))}
+                    {verdict.red_flags?.slice(0,2).map((f,i)=>(
+                      <div key={i} style={{display:"flex",gap:9,marginBottom:7,alignItems:"flex-start"}}>
+                        <span style={{color:C.red,fontSize:12,flexShrink:0,marginTop:2,fontWeight:700}}>↓</span>
+                        <span style={{fontSize:13,color:C.text,lineHeight:1.5}}><strong>{f.flag}</strong> — {f.evidence}</span>
+                      </div>
+                    ))}
+                    <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid rgba(26,26,46,0.08)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+                      <p style={{fontSize:12,color:C.muted,lineHeight:1.5}}>Full report: gap analysis, scenario modelling, pre-pitch agenda</p>
+                      <a href="mailto:info@neuralsurface.com?subject=My Signal Full Report Request" style={{fontSize:13,color:C.purple,fontWeight:700,textDecoration:"none",whiteSpace:"nowrap"}}>Get full report →</a>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* What happens next */}
+              <div style={{background:"rgba(26,26,46,0.02)",border:`1px solid ${C.border}`,borderRadius:8,padding:"14px 16px"}}>
+                <p style={{fontSize:12,color:C.muted,lineHeight:2}}>
+                  <strong style={{color:C.text}}>What happens next</strong><br/>
+                  1. Signals reviews your submission against ISS v20.1<br/>
+                  2. Your signal report is written — gaps, next moves, pitch deck rating<br/>
+                  3. Report delivered to your email within 24 hours of payment
+                </p>
+              </div>
+              <p style={{marginTop:14,fontSize:11,color:C.mutedLo,textAlign:"center"}}>info@neuralsurface.com · Signals</p>
             </div>
           )}
 
@@ -438,23 +535,60 @@ function App() {
   );
 }
 
-function FileField({f,up,onChange,C}){
-  const ref=useRef(null);
-  return(
+// ── Sub-components ──────────────────────────────────────────
+
+function FileField({f, up, onChange, C}) {
+  const ref = useRef(null);
+  const borderColor = up?.url ? "rgba(45,125,70,0.4)" : up?.error ? "rgba(192,57,43,0.3)" : undefined;
+  return (
     <div>
-      <div className="fzone" onClick={()=>ref.current?.click()} style={{borderColor:up?.url?"rgba(45,125,70,0.4)":up?.error?"rgba(233,69,96,0.3)":undefined}}>
-        <input ref={ref} type="file" className="fin" accept={f.accept} onChange={e=>e.target.files?.[0]&&onChange(e.target.files[0])}/>
-        {!up&&<p style={{fontSize:13,color:"rgba(232,228,220,0.28)"}}>📎 Click to upload {f.accept?.includes("pdf")?"PDF":"file"}</p>}
-        {up?.uploading&&<><div style={{width:18,height:18,margin:"0 auto 6px",borderRadius:"50%",border:"2px solid rgba(124,111,205,0.25)",borderTop:"2px solid #7c6fcd",animation:"spin 1s linear infinite"}}/><p style={{fontSize:12,color:"rgba(232,228,220,0.3)"}}>Uploading...</p></>}
-        {up?.url&&<div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span style={{color:"#2d7d46"}}>✓</span><span style={{fontSize:13,color:"#2d7d46"}}>{up.file.name}</span><span style={{fontSize:11,color:"rgba(232,228,220,0.22)"}}>— click to replace</span></div>}
-        {up?.error&&<p style={{fontSize:13,color:"#e94560"}}>{up.error} — click to retry</p>}
+      <div className="fzone" onClick={()=>ref.current?.click()} style={{borderColor}}>
+        <input ref={ref} type="file" className="fin" accept={f.accept}
+          onChange={e=>e.target.files?.[0]&&onChange(e.target.files[0])}/>
+        {!up && <p style={{fontSize:13,color:"#9896aa"}}>📎 Click to upload {f.accept?.includes("pdf")?"PDF":"file"}</p>}
+        {up?.uploading && (
+          <div>
+            <div style={{width:18,height:18,margin:"0 auto 6px",borderRadius:"50%",border:"2px solid rgba(90,79,168,0.2)",borderTop:"2px solid #5a4fa8",animation:"spin 1s linear infinite"}}/>
+            <p style={{fontSize:12,color:"#9896aa"}}>Uploading...</p>
+          </div>
+        )}
+        {up?.url && (
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <span style={{color:"#2d7d46",fontSize:15,fontWeight:700}}>✓</span>
+            <span style={{fontSize:13,color:"#2d7d46",fontWeight:500}}>{up.file.name}</span>
+            <span style={{fontSize:11,color:"#9896aa"}}>— click to replace</span>
+          </div>
+        )}
+        {up?.error && <p style={{fontSize:13,color:"#c0392b"}}>{up.error} — click to retry</p>}
       </div>
     </div>
   );
 }
 
-function Logo({sub}){
-  return(
+function NavLink({href, label, active, C, small}) {
+  const size = small ? 13 : 14;
+  const pad  = small ? "6px 12px" : "7px 14px";
+  return (
+    <a href={href} style={{
+      fontSize:size, color:active?C.purple:C.muted, textDecoration:"none",
+      padding:pad, borderRadius:6, fontWeight:active?600:500,
+      background:active?C.purpleDim:"transparent",
+      border:`1px solid ${active?C.purpleBorder:"transparent"}`,
+    }}>{label}</a>
+  );
+}
+
+function PriceBadge({label, sub, color, bg, border}) {
+  return (
+    <div style={{flex:1,background:bg,border:`1px solid ${border}`,borderRadius:7,padding:"10px 12px",textAlign:"center"}}>
+      <div style={{fontSize:12,fontWeight:700,color}}>{label}</div>
+      <div style={{fontSize:12,color:"#5a5870",marginTop:2}}>{sub}</div>
+    </div>
+  );
+}
+
+function Logo({sub}) {
+  return (
     <a href="index.html" style={{display:"flex",alignItems:"center",gap:11,textDecoration:"none"}}>
       <div style={{width:29,height:29,background:"linear-gradient(135deg,#7c6fcd,#5a4fa8)",borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"white",fontFamily:"'Playfair Display',serif"}}>S</div>
       <div>
